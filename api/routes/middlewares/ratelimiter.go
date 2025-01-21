@@ -2,30 +2,39 @@ package middlewares
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
 )
 
-var stored = 0
+var stored float64 = 0 // Represent request stored at bucket
 
-const bucket_size = 10
+const bucket_size = 10 // Represent volume bucket capacity
 
-var last_stamped_t = 0
+var l_time = time.Now() // It's used to measure elapsed time
 
-const period = 10
+const tokenPerPeriod = 6 // Represent quantity throttle allows per second
 
 func LeakyBucket(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		//Verify if bucket is full
+		tm := time.Now()
+		elapsed := tm.Sub(l_time)
+		l_time = tm
+		var consumes = elapsed.Seconds() * tokenPerPeriod
+		fmt.Println("Token stored ", stored)
+		stored = math.Max(0, stored-consumes)
+		fmt.Println("Elapsed time ", elapsed)
 		if stored < bucket_size {
+			fmt.Println("Accept with tokens", stored)
 			stored++
+
 		} else {
+			fmt.Println("Denied 429")
 			return c.JSON(http.StatusTooManyRequests, 429)
 		}
-		tm := time.Now()
-
-		fmt.Println(tm)
 		return next(c)
 	}
 }
